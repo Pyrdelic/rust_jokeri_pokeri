@@ -1,6 +1,6 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::io::{self, Write};
+use std::{char, io::{self, Write}};
 
 
 
@@ -32,6 +32,7 @@ impl Deck{
             rng: thread_rng(),
         };
         deck.fill_deck();
+        //deck.print();
         deck.shuffle_deck();
         return deck;
 
@@ -49,14 +50,26 @@ impl Deck{
         // values
         for value in 1..=13{
             //suites
-            for character_code in 0x2660..=0x2665{
+            for character_code in 0x2660..=0x2663{
                 self.cards.push(Card::new(u8::from(value), char::from_u32(character_code).unwrap()))
             }
         }
-        // add 2 joker cards
-        self.cards.push(Card::new(0, 'J'));
-        self.cards.push(Card::new(0, 'J'));
+        // TODO: add 2 (and implement) joker cards
+        // self.cards.push(Card::new(0, 'J'));
+        // self.cards.push(Card::new(0, 'J'));
     }
+}
+
+enum WinCondition {
+    FiveOfAKind,
+    StraightFlush,
+    FourOfAKind,
+    FullHouse,
+    Flush,
+    Straight,
+    ThreeOfAKind,
+    TwoPair,
+    NoWin,
 }
 struct Hand{
     //cards: Vec<Card>,
@@ -84,6 +97,60 @@ impl Hand{
             }
         }
         return false
+    }
+
+    fn is_straight(&self)->bool{
+        let mut hand_vec  = Vec::<&Card>::new();
+        for element in &self.cards{
+            match element{
+                Some(card)=>{
+                    hand_vec.push(card);
+                }
+                None=>{
+                    // Not enough cards in hand for a straight
+                    return false;
+                }
+            }
+        }
+        hand_vec.sort_unstable_by_key(|card| card.value);
+        let mut curr_value: u8 = hand_vec.get(0).unwrap().value;
+        for i in 1..hand_vec.len(){
+            let next_value = hand_vec.get(i).unwrap().value;
+            if next_value - curr_value != 1{
+                return false;
+            }
+            else {
+                curr_value = next_value;
+            }
+        }
+        return true;
+    }
+
+    fn is_flush(&self)->bool{
+        let first_suit = match &self.cards[0]{
+            Some(card)=>{
+                card.suit
+            }
+            None=>{
+                return false;
+            }
+        };
+        for i in 1..self.cards.len(){
+            let _ = match &self.cards[i]{
+                Some(card)=>{
+                    if first_suit == card.suit{
+                        continue;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                None=>{
+                    return false;
+                }
+            };
+        }
+        return true;
     }
 
     fn print(&self){
@@ -297,6 +364,10 @@ impl JokeriPokeri{
             }
             GameState::PayOut=>{
                 self.hand.print();
+
+                // check if hand meets win conditions
+
+
                 let input = self.promt_and_input();
             }   
         }
@@ -328,4 +399,55 @@ fn main() {
 
     let mut game = JokeriPokeri::new();
     game.play();
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+    
+
+    #[test]
+    fn test_straight(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(3, uni_hearts));
+        hand.cards[2] = Some(Card::new(4, uni_clubs));
+        hand.cards[3] = Some(Card::new(5, uni_clubs));
+        hand.cards[4] = Some(Card::new(6, uni_clubs));
+
+        assert_eq!(hand.is_straight(), true);
+
+        hand.cards[0] = Some(Card::new(10, uni_spade));
+
+        assert_eq!(hand.is_straight(), false);
+    }
+    #[test]
+    fn test_flush(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(10, uni_spade));
+        hand.cards[1] = Some(Card::new(6, uni_spade));
+        hand.cards[2] = Some(Card::new(4, uni_spade));
+        hand.cards[3] = Some(Card::new(13, uni_spade));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_flush(), true);
+
+        hand.cards[0] = Some(Card::new(10, uni_spade));
+        hand.cards[1] = Some(Card::new(6, uni_spade));
+        hand.cards[2] = Some(Card::new(4, uni_hearts));
+        hand.cards[3] = Some(Card::new(13, uni_spade));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+        
+        assert_eq!(hand.is_flush(), false);
+    }
 }
