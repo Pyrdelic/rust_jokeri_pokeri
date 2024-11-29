@@ -61,14 +61,14 @@ impl Deck{
 }
 
 enum WinCondition {
-    FiveOfAKind,
+    //FiveOfAKind,
     StraightFlush,
     FourOfAKind,
     FullHouse,
     Flush,
     Straight,
     ThreeOfAKind,
-    TwoPair,
+    TwoPairs,
     NoWin,
 }
 struct Hand{
@@ -88,15 +88,112 @@ impl Hand{
     fn has_nones(&self)->bool{
         for element in &self.cards{
             match element{
-                Some(_)=>{
-
-                }
+                Some(_)=>{ continue; }
                 None=>{
                     return true
                 }
             }
         }
         return false
+    }
+
+    fn is_straight_flush(&self)->bool{
+        if self.is_straight() && self.is_flush(){
+            return true;
+        }
+        return false;
+    }
+
+    fn is_four_of_a_kind(&self)->bool{
+        // loop through cards
+        for i in &self.cards{
+            match i{
+                Some(card)=>{
+                    // check how many times that cards value is found
+                    let count = self.cards.iter()
+                    .filter(|&x| x.as_ref().unwrap().value == card.value).count();
+                    if count >= 4{
+                        return true;
+                    }
+                }
+                None=>{
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    fn is_full_house(&self)->bool{
+        if self.is_three_of_a_kind(){
+            // check that there are only two kinds of values in hand
+            // (four of a kind is checked before full house)
+            let mut unique_values = Vec::<u8>::new();
+            for element in &self.cards{
+                match element{
+                    Some(card)=>{
+                        if !unique_values.contains(&card.value){
+                            unique_values.push(card.value);
+                        }
+                    }
+                    None=>{
+                        return false;
+                    }
+                }
+                if unique_values.len() > 2{
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    fn is_three_of_a_kind(&self)->bool{
+        // loop through cards
+        for i in &self.cards{
+            match i{
+                Some(card)=>{
+                    // check how many times that cards value is found
+                    let count = self.cards.iter()
+                    .filter(|&x| x.as_ref().unwrap().value == card.value).count();
+                    if count >= 3{
+                        return true;
+                    }
+                }
+                None=>{
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    fn is_flush(&self)->bool{
+        let first_suit = match &self.cards[0]{
+            Some(card)=>{
+                card.suit
+            }
+            None=>{
+                return false;
+            }
+        };
+        for i in 1..self.cards.len(){
+            let _ = match &self.cards[i]{
+                Some(card)=>{
+                    if first_suit == card.suit{
+                        continue;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                None=>{
+                    return false;
+                }
+            };
+        }
+        return true;
     }
 
     fn is_straight(&self)->bool{
@@ -126,32 +223,32 @@ impl Hand{
         return true;
     }
 
-    fn is_flush(&self)->bool{
-        let first_suit = match &self.cards[0]{
-            Some(card)=>{
-                card.suit
-            }
-            None=>{
-                return false;
-            }
-        };
-        for i in 1..self.cards.len(){
-            let _ = match &self.cards[i]{
+    fn is_two_pairs(&self)->bool{
+        let mut pairs_count: u8 = 0;
+        let mut first_pair_value: u8 = 0;
+        for i in &self.cards{
+            match i{
                 Some(card)=>{
-                    if first_suit == card.suit{
-                        continue;
-                    }
-                    else {
-                        return false;
+                    // check how many times that cards value is found
+                    let count = self.cards.iter()
+                    .filter(|&x| x.as_ref().unwrap().value == card.value).count();
+                    if count >= 2 && card.value != first_pair_value{
+                        pairs_count += 1;
+                        first_pair_value = card.value;
                     }
                 }
                 None=>{
                     return false;
                 }
-            };
+            }
+            if pairs_count >= 2{
+                return true;
+            }
         }
-        return true;
+        return false;
     }
+
+    
 
     fn print(&self){
         // suits row
@@ -253,7 +350,7 @@ impl JokeriPokeri{
         let _ = std::io::stdout().flush();
     }
 
-    /// The actual state machine. If input is valid, changes proceeds GameState and updates data accordingly.
+    /// The actual state machine. If input is valid, proceeds GameState and updates data accordingly.
     /// If invalid, returns early without modifying data.
     fn process(&mut self){
         match self.state{
@@ -383,7 +480,6 @@ impl JokeriPokeri{
             self.print_stats();
             self.process();
         }
-        
     }
 
     fn print_stats(&self){
@@ -404,10 +500,9 @@ fn main() {
 #[cfg(test)]
 mod tests{
     use super::*;
-    
 
     #[test]
-    fn test_straight(){
+    fn straight(){
         let mut hand = Hand::new();
         let uni_spade = char::from_u32(0x2660).unwrap();
         let uni_hearts = char::from_u32(0x2661).unwrap();
@@ -427,7 +522,7 @@ mod tests{
         assert_eq!(hand.is_straight(), false);
     }
     #[test]
-    fn test_flush(){
+    fn flush(){
         let mut hand = Hand::new();
         let uni_spade = char::from_u32(0x2660).unwrap();
         let uni_hearts = char::from_u32(0x2661).unwrap();
@@ -449,5 +544,118 @@ mod tests{
         hand.cards[4] = Some(Card::new(6, uni_spade));
         
         assert_eq!(hand.is_flush(), false);
+    }
+    #[test]
+    fn straight_flush(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(3, uni_spade));
+        hand.cards[2] = Some(Card::new(4, uni_spade));
+        hand.cards[3] = Some(Card::new(5, uni_spade));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_straight_flush(), true);
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(3, uni_spade));
+        hand.cards[2] = Some(Card::new(4, uni_hearts));
+        hand.cards[3] = Some(Card::new(5, uni_spade));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_straight_flush(), false);
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(3, uni_spade));
+        hand.cards[2] = Some(Card::new(10, uni_spade));
+        hand.cards[3] = Some(Card::new(5, uni_spade));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_straight_flush(), false);
+    }
+    #[test]
+    fn four_of_a_kind(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(2, uni_hearts));
+        hand.cards[2] = Some(Card::new(2, uni_clubs));
+        hand.cards[3] = Some(Card::new(2, uni_diamond));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_four_of_a_kind(), true);
+
+        hand.cards[2] = Some(Card::new(5, uni_clubs));
+
+        assert_eq!(hand.is_four_of_a_kind(), false);
+    }
+
+    #[test]
+    fn three_of_a_kind(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(2, uni_hearts));
+        hand.cards[2] = Some(Card::new(2, uni_clubs));
+        hand.cards[3] = Some(Card::new(12, uni_diamond));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_three_of_a_kind(), true);
+
+        hand.cards[2] = Some(Card::new(5, uni_clubs));
+
+        assert_eq!(hand.is_three_of_a_kind(), false);
+    }
+    #[test]
+    fn full_house(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(2, uni_hearts));
+        hand.cards[2] = Some(Card::new(2, uni_clubs));
+        hand.cards[3] = Some(Card::new(4, uni_diamond));
+        hand.cards[4] = Some(Card::new(4, uni_spade));
+
+        assert_eq!(hand.is_full_house(), true);
+
+        hand.cards[4] = Some(Card::new(5, uni_clubs));
+
+        assert_eq!(hand.is_full_house(), false);
+    }
+    #[test]
+    fn two_pairs(){
+        let mut hand = Hand::new();
+        let uni_spade = char::from_u32(0x2660).unwrap();
+        let uni_hearts = char::from_u32(0x2661).unwrap();
+        let uni_diamond = char::from_u32(0x2662).unwrap();
+        let uni_clubs = char::from_u32(0x2663).unwrap();
+
+        hand.cards[0] = Some(Card::new(2, uni_spade));
+        hand.cards[1] = Some(Card::new(2, uni_hearts));
+        hand.cards[2] = Some(Card::new(4, uni_clubs));
+        hand.cards[3] = Some(Card::new(4, uni_diamond));
+        hand.cards[4] = Some(Card::new(6, uni_spade));
+
+        assert_eq!(hand.is_two_pairs(), true);
+
+        hand.cards[0] = Some(Card::new(7, uni_clubs));
+
+        assert_eq!(hand.is_two_pairs(), false);
     }
 }
