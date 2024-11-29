@@ -306,7 +306,7 @@ impl JokeriPokeri{
             hand: Hand::new(),
             discarded: Vec::new(),
             funds: 100, 
-            round: 0, 
+            round: 1, 
             bet_amount: 0,
             latest_payout: 0,
             state: GameState::Betting,
@@ -342,7 +342,7 @@ impl JokeriPokeri{
                 println!("Select cards to hold (for example: 1 3 5)");
             }
             GameState::PayOut =>{
-                println!("PayOut prompt");
+                println!("Input anything for a new round");
             }
             _=>{()}
         }
@@ -463,9 +463,55 @@ impl JokeriPokeri{
                 self.hand.print();
 
                 // check if hand meets win conditions
+                // maintain order from highest to lowest
+                if self.hand.is_straight_flush(){
+                    println!("Straight flush!");
+                    self.funds += 40 * self.bet_amount;
+                }
+                else if self.hand.is_four_of_a_kind(){
+                    println!("Four of a kind!");
+                    self.funds += 15 * self.bet_amount;
+                }
+                else if self.hand.is_full_house(){
+                    println!("Full house!");
+                    self.funds += 7 * self.bet_amount;
+                }
+                else if self.hand.is_flush(){
+                    println!("Flush!");
+                    self.funds += 4 * self.bet_amount;
+                }
+                else if self.hand.is_straight(){
+                    println!("Straight!");
+                    self.funds += 3 * self.bet_amount;
+                }
+                else if self.hand.is_three_of_a_kind(){
+                    println!("Three of a kind!");
+                    self.funds += 2 * self.bet_amount;
+                }
+                else if self.hand.is_two_pairs(){
+                    println!("Two pairs!");
+                    self.funds += 2 * self.bet_amount;
+                }
+                else{
+                    println!("No win :(");
+                }
 
-
-                let input = self.promt_and_input();
+                // transfer cards from hand back to deck
+                for i in 0..self.hand.cards.len(){
+                    match self.hand.cards[i].take(){
+                        Some(card)=>{
+                            self.deck.cards.push(card);
+                        }
+                        None=>{}
+                    }
+                }
+                // transfer cards from discarded back to deck
+                for i in 0..self.discarded.len(){
+                    self.deck.cards.push(self.discarded.remove(0));
+                }
+                self.round += 1;
+                self.state = GameState::Betting;
+                //let input = self.promt_and_input();
             }   
         }
     }
