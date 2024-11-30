@@ -1,6 +1,7 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::{char, io::{self, Write}};
+use console::Term;
 
 
 
@@ -297,7 +298,8 @@ struct JokeriPokeri{
     bet_amount: u32,
     latest_payout: u32,
     state: GameState,
-    playing: bool
+    playing: bool,
+    selector: u8,
 }
 impl JokeriPokeri{
     fn new()->Self{
@@ -307,12 +309,35 @@ impl JokeriPokeri{
             discarded: Vec::new(),
             funds: 100, 
             round: 1, 
-            bet_amount: 0,
+            bet_amount: 20,
             latest_payout: 0,
             state: GameState::Betting,
             playing: true, 
+            selector: 0,
         };
-        return game
+        return game;
+    }
+
+    fn cycle_bet_amount(&mut self){
+        if self.bet_amount < 100 && self.funds >= self.bet_amount + 20{
+            self.bet_amount += 20;
+        }
+        else {
+            self.bet_amount = 20;
+        }
+    }
+
+    fn query_quit(&mut self, input: &String){
+        let input_lowercase = input.to_lowercase();
+        match input_lowercase.as_str(){
+            "quit" | "exit" =>{
+                println!("Quitting.");
+                self.playing = false;
+            }
+            _ => {
+
+            }
+        }
     }
 
     fn promt_and_input(&self)->String{
@@ -350,6 +375,11 @@ impl JokeriPokeri{
         let _ = std::io::stdout().flush();
     }
 
+    /// "getchar"-based input handling
+    fn process_input(&mut self){
+
+    }
+
     /// The actual state machine. If input is valid, proceeds GameState and updates data accordingly.
     /// If invalid, returns early without modifying data.
     fn process(&mut self){
@@ -357,6 +387,7 @@ impl JokeriPokeri{
             GameState::Betting =>{
                 //println!("GameState: Betting");
                 let input = self.promt_and_input();
+                self.query_quit(&input);
                 let bet_amount: u32 = match input.trim().parse::<u32>(){
                     Ok(amt) =>{
                         amt
@@ -518,13 +549,85 @@ impl JokeriPokeri{
 
     pub fn play(&mut self){
 
-        let mut playing: bool = true;
+        //let mut playing: bool = true;
+        //let stdout = Term::buffered_stdout();
+        let term = Term::stdout();
         
-        while playing {
+        loop {
+            // draw screen
+
+            // handle input
+            match term.read_key().unwrap(){
+                console::Key::Escape =>{
+                    println!("Exiting...");
+                    break;
+                }
+                console::Key::Enter =>{
+                    match self.state{
+                        GameState::Betting =>{
+                            self.funds -= self.bet_amount;
+                            self.state = GameState::HandSelection;
+                        }
+                        GameState::HandSelection =>{
+
+                        }
+                        GameState::PayOut =>{
+
+                        }
+                    }
+                }
+                console::Key::Char('b') =>{
+                    if self.state == GameState::Betting{
+                        self.cycle_bet_amount();
+                    }
+                }
+                console::Key::ArrowLeft =>{
+                    if self.state == GameState::HandSelection{
+                        // move selector left
+                        if self.selector > 0{
+                            self.selector -= 1;
+                        }
+                    }
+                }
+                console::Key::ArrowRight =>{
+                    if self.state == GameState::HandSelection{
+                        // move selector right
+                        if self.selector < 4{
+                            self.selector += 1;
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+
+            // if let Ok(character) = stdout.read_char(){
+            //     match character {
+            //         'q' | 'Q' => {
+            //             self.playing = false;
+            //             break;
+            //         }
+            //         'b' | 'B' =>{
+            //             if self.state == GameState::Betting{
+            //                 if self.bet_amount < 100{
+            //                     self.bet_amount += 20;
+            //                 }
+            //                 else {
+            //                     self.bet_amount = 20;
+            //                 }
+            //             }
+            //         }
+
+            //         _ => {
+            //             println!("{}", character);
+            //         }
+            //     }
+            // }
+            
 
             // read user input
-            self.print_stats();
-            self.process();
+            //self.print_stats();
+            //self.process();
         }
     }
 
