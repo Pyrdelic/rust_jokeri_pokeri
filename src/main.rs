@@ -1,6 +1,6 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::{char, io::{self, Write}};
+use std::{char, env, io::{self, Write}};
 use console::Term;
 
 
@@ -299,7 +299,8 @@ struct JokeriPokeri{
     latest_payout: u32,
     state: GameState,
     playing: bool,
-    selector: u8,
+    selector: usize,
+    selected: [bool; 5],
 }
 impl JokeriPokeri{
     fn new()->Self{
@@ -314,8 +315,62 @@ impl JokeriPokeri{
             state: GameState::Betting,
             playing: true, 
             selector: 0,
+            selected: [false, false, false, false, false],
         };
         return game;
+    }
+
+    /// Deals cards from deck to every unselected slot in hand.
+    /// Discards all unselected cards if in hand.
+    fn deal(&mut self){
+        for i in 0..self.hand.cards.len(){
+            // skip those cards that are selected to hold
+            if !self.selected[i]{
+                // discard if unselected card in hand
+                let element = self.hand.cards[i].take();
+                match element{
+                    Some(card) =>{
+                        self.discarded.push(card);
+                    }
+                    _ =>{
+
+                    }
+                }
+                // draw a new card to hand.
+                self.hand.cards[i] = Some(self.deck.cards.remove(0));
+            }
+        }
+    }
+
+    fn reset_deck_and_hand(&mut self){
+        // discard hand to discard pile
+        for i in 0.. self.hand.cards.len(){
+            let element = self.hand.cards[i].take();
+            match element{
+                Some(card) => {
+                    self.discarded.push(card);
+                }
+                None => {
+                }
+            }
+        }
+
+        // discard discard back to deck
+        for i in 0..self.discarded.len(){
+            self.deck.cards.push(self.discarded.remove(0));
+        }
+        // shuffle deck
+        self.deck.shuffle_deck();
+    }
+
+    fn toggle_selection(&mut self){
+        self.selected[self.selector] = !self.selected[self.selector];
+    }
+
+    fn reset_selections(&mut self){
+        for i in 0..self.selected.len(){
+            self.selected[i] = false;
+        }
     }
 
     fn cycle_bet_amount(&mut self){
@@ -375,9 +430,52 @@ impl JokeriPokeri{
         let _ = std::io::stdout().flush();
     }
 
-    /// "getchar"-based input handling
-    fn process_input(&mut self){
+    fn print_screen(&self){
+        println!();
+        self.print_stats();
+        println!();
+        println!();
+        println!();
+        match self.state{
+            GameState::Betting=>{
+                println!("b - cycle bet amount");
+                println!("enter - start game");
+            }
+            GameState::HandSelection=>{
+                println!("left/right - move selector");
+                println!("space - select card");
+                println!("enter - continue");
+                self.hand.print();
+                // print selected row
+                for i in self.selected{
+                    if i{
+                        print!("HLD");
+                    } else {
+                        print!("   ");
+                    }
+                }
+                //std::io::stdout().flush();
+                println!();
+                // print selector cursor position
+                for i in 0..self.hand.cards.len(){
+                    if self.selector == i{
+                        print!(" ^ ");
+                    } else{
+                        print!("   ");
+                    }
+                }
+                println!();
 
+            }
+            GameState::PayOut=>{
+                if self.funds == 0{
+                    println!("GAME OVER");
+                    println!("OUT OF FUNDS");
+                    println!("Continue to new game...");
+                }
+                self.hand.print();
+            }
+        }
     }
 
     /// The actual state machine. If input is valid, proceeds GameState and updates data accordingly.
@@ -554,8 +652,9 @@ impl JokeriPokeri{
         let term = Term::stdout();
         
         loop {
-            // draw screen
-
+            // print screen
+            let _ = term.clear_screen();
+            self.print_screen();
             // handle input
             match term.read_key().unwrap(){
                 console::Key::Escape =>{
@@ -566,19 +665,66 @@ impl JokeriPokeri{
                     match self.state{
                         GameState::Betting =>{
                             self.funds -= self.bet_amount;
+
+                            self.deck.shuffle_deck();
+                            self.reset_selections();
+                            self.deal();
                             self.state = GameState::HandSelection;
                         }
                         GameState::HandSelection =>{
+                            self.hand.print();
+                            self.deal();
+                            // check wins
+                            if self.hand.is_straight_flush(){
+                                println!("Straight flush!");
+                                self.funds += 40 * self.bet_amount;
+                            }
+                            else if self.hand.is_four_of_a_kind(){
+                                println!("Four of a kind!");
+                                self.funds += 15 * self.bet_amount;
+                            }
+                            else if self.hand.is_full_house(){
+                                println!("Full house!");
+                                self.funds += 7 * self.bet_amount;
+                            }
+                            else if self.hand.is_flush(){
+                                println!("Flush!");
+                                self.funds += 4 * self.bet_amount;
+                            }
+                            else if self.hand.is_straight(){
+                                println!("Straight!");
+                                self.funds += 3 * self.bet_amount;
+                            }
+                            else if self.hand.is_three_of_a_kind(){
+                                println!("Three of a kind!");
+                                self.funds += 2 * self.bet_amount;
+                            }
+                            else if self.hand.is_two_pairs(){
+                                println!("Two pairs!");
+                                self.funds += 2 * self.bet_amount;
+                            }
+                            else{
+                                println!("No win :(");
+                            }
+                            self.state = GameState::PayOut;
 
+                            
                         }
                         GameState::PayOut =>{
-
+                            // confirm new round
+                            //self.print_prompt();
+                            self.state = GameState::Betting;
                         }
                     }
                 }
                 console::Key::Char('b') =>{
                     if self.state == GameState::Betting{
                         self.cycle_bet_amount();
+                    }
+                }
+                console::Key::Char(' ') =>{
+                    if self.state == GameState::HandSelection{
+                        self.toggle_selection();
                     }
                 }
                 console::Key::ArrowLeft =>{
@@ -640,6 +786,7 @@ impl JokeriPokeri{
 
 
 fn main() {
+    //env::set_var("RUST_BACKTRACE", "1");
     println!("Rust JokeriPokeri, a Pyrdelic excercise");
 
     let mut game = JokeriPokeri::new();
@@ -806,5 +953,50 @@ mod tests{
         hand.cards[0] = Some(Card::new(7, uni_clubs));
 
         assert_eq!(hand.is_two_pairs(), false);
+    }
+    #[test]
+    fn deal(){
+        let mut game = JokeriPokeri::new();
+        // hand must be empty before deal
+        for option_card in &game.hand.cards{
+            match option_card{
+                Some(..) => {
+                    panic!("Cards in hand before deal");
+                }
+                None => {}
+            }
+        }
+        // has_nones
+        assert_eq!(game.hand.has_nones(), true);
+
+        let deck_len_before_deal = game.deck.cards.len();
+        // deal
+        game.deal();
+        assert_eq!(game.hand.has_nones(), false);
+
+        let deck_len_after_deal = game.deck.cards.len();
+        assert_eq!(deck_len_before_deal - deck_len_after_deal, game.hand.cards.len());
+        assert_eq!(game.discarded.len(), 0);
+        
+        game.selected[2] = true;
+        game.selected[3] = true;
+
+        game.deal();
+        // discarding from hand
+        assert_eq!(game.discarded.len(), game.hand.cards.len() - 2);
+        let deck_len_after_hand_selection_deal = game.deck.cards.len();
+        assert_eq!(deck_len_after_deal - deck_len_after_hand_selection_deal, game.hand.cards.len()-2);
+    }
+    #[test]
+    fn reset_deck_and_hand(){
+        let mut game = JokeriPokeri::new();
+        let deck_size_before_deal = game.deck.cards.len();
+        game.deal();
+        game.selected[1] = true;
+        game.selected[2] = true;
+        game.deal();
+        game.reset_deck_and_hand();
+        assert_eq!(deck_size_before_deal, game.deck.cards.len());
+        assert_eq!(game.discarded.len(), 0);
     }
 }
