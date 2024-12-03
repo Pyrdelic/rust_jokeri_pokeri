@@ -395,13 +395,6 @@ impl JokeriPokeri{
         }
     }
 
-    fn promt_and_input(&self)->String{
-        self.print_prompt();
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Failed to read input");
-        input
-    }
-
     fn bet_money(&mut self, bet_amount: u32){
         if bet_amount >= 1 && bet_amount <= 100
         && self.funds >= bet_amount{
@@ -411,23 +404,6 @@ impl JokeriPokeri{
         } else{
             println!("Invaid bet!")
         }
-    }
-
-    fn print_prompt(&self){
-        match self.state{
-            GameState::Betting => {
-                println!("Place your bet (1-100)");
-            }
-            GameState::HandSelection =>{
-                println!("Select cards to hold (for example: 1 3 5)");
-            }
-            GameState::PayOut =>{
-                println!("Input anything for a new round");
-            }
-            _=>{()}
-        }
-        print!(">");
-        let _ = std::io::stdout().flush();
     }
 
     fn print_screen(&self){
@@ -445,6 +421,7 @@ impl JokeriPokeri{
                 println!("left/right - move selector");
                 println!("space - select card");
                 println!("enter - continue");
+
                 self.hand.print();
                 // print selected row
                 for i in self.selected{
@@ -471,177 +448,9 @@ impl JokeriPokeri{
                 if self.funds == 0{
                     println!("GAME OVER");
                     println!("OUT OF FUNDS");
-                    println!("Continue to new game...");
                 }
                 self.hand.print();
             }
-        }
-    }
-
-    /// The actual state machine. If input is valid, proceeds GameState and updates data accordingly.
-    /// If invalid, returns early without modifying data.
-    fn process(&mut self){
-        match self.state{
-            GameState::Betting =>{
-                //println!("GameState: Betting");
-                let input = self.promt_and_input();
-                self.query_quit(&input);
-                let bet_amount: u32 = match input.trim().parse::<u32>(){
-                    Ok(amt) =>{
-                        amt
-                    }
-                    Err(..) =>{
-                        println!("Invalid input.");
-                        return;
-                    }
-                };
-    
-                if bet_amount < 1 || bet_amount > 100{
-                    println!("Invalid bet, must be between 1 and 100.");
-                    return;
-                }
-                if self.funds < bet_amount{
-                    println!("Insufficient funds!");
-                    return;
-                }
-    
-                // bet valid, proceed to next state
-                self.funds -= bet_amount;
-                self.bet_amount = bet_amount;
-    
-                self.deck.shuffle_deck();
-                // draw 5 cards to hand
-                // print cards in hand
-                // println!("Cards in hand before deal:");
-                // self.hand.print();
-    
-                for i in 0..5{
-                    self.hand.cards[i] = Some(self.deck.cards.remove(0));
-                }
-    
-                // println!("Cards after hand transfer:");
-                // for card in &self.hand{
-                //     card.print();
-                // }
-                self.state = GameState::HandSelection;
-                // println!("Hand len at the end of betting: {}", self.hand.cards.len());
-                // println!("End of betting.");
-            }
-            GameState::HandSelection =>{
-                //println!("Hand len at the start of handselection {}", self.hand.cards.len());
-                //println!("State: handselection");
-                // print cards in hand
-                //println!("Cards in hand before selection:");
-                self.hand.print();
-                // split input String
-                let input = self.promt_and_input();
-                let parts = input.trim().split(" ");
-
-                // validate parts
-                if parts.clone().count() > 5{
-                    println!("Invalid input.");
-                    return;
-                }
-                // check that each part parses into u8
-                let mut selections: Vec<u8> = Vec::new();
-                for part in parts{
-                    match part.parse(){
-                        Ok( value ) =>{
-                            if !selections.contains(&value){
-                                selections.push(value);
-                            }
-                        }
-                        Err(_)=>{
-                            return;
-                        }
-                    }
-                }
-                // check range of each selection 1..=5
-                for selection in selections.clone(){
-                    if selection < 1 || selection > 5{
-                        println!("Card selection out of range (1..=5)");
-                        return;
-                    }
-                }
-
-                // Selections are valid.
-                // Discard unselected cards,
-                // Draw new in place of them.
-                for i in 0..self.hand.cards.len(){
-                    let selection_value = u8::try_from(i+1).unwrap();
-                    if !selections.contains(&selection_value){
-                        // card not selected, discard and draw new from deck
-                        let element_to_discard = self.hand.cards[i].take();
-                        match element_to_discard{
-                            Some(card_to_discard)=>{
-                                self.discarded.push(card_to_discard);
-                                self.hand.cards[i] = Some(self.deck.cards.remove(0));
-                            }
-                            None=>{
-                                // Something went wrong,
-                                // revert to prevent a Card from getting destroyed.
-                                self.hand.cards[i] = element_to_discard;
-                            }
-                        }
-                    }
-                }
-                // Proceed to next state.
-                self.state = GameState::PayOut;
-            }
-            GameState::PayOut=>{
-                self.hand.print();
-
-                // check if hand meets win conditions
-                // maintain order from highest to lowest
-                if self.hand.is_straight_flush(){
-                    println!("Straight flush!");
-                    self.funds += 40 * self.bet_amount;
-                }
-                else if self.hand.is_four_of_a_kind(){
-                    println!("Four of a kind!");
-                    self.funds += 15 * self.bet_amount;
-                }
-                else if self.hand.is_full_house(){
-                    println!("Full house!");
-                    self.funds += 7 * self.bet_amount;
-                }
-                else if self.hand.is_flush(){
-                    println!("Flush!");
-                    self.funds += 4 * self.bet_amount;
-                }
-                else if self.hand.is_straight(){
-                    println!("Straight!");
-                    self.funds += 3 * self.bet_amount;
-                }
-                else if self.hand.is_three_of_a_kind(){
-                    println!("Three of a kind!");
-                    self.funds += 2 * self.bet_amount;
-                }
-                else if self.hand.is_two_pairs(){
-                    println!("Two pairs!");
-                    self.funds += 2 * self.bet_amount;
-                }
-                else{
-                    println!("No win :(");
-                }
-
-                // transfer cards from hand back to deck
-                for i in 0..self.hand.cards.len(){
-                    match self.hand.cards[i].take(){
-                        Some(card)=>{
-                            self.deck.cards.push(card);
-                        }
-                        None=>{}
-                    }
-                }
-                // transfer cards from discarded back to deck
-                for i in 0..self.discarded.len(){
-                    self.deck.cards.push(self.discarded.remove(0));
-                }
-                self.round += 1;
-                self.state = GameState::Betting;
-                //let input = self.promt_and_input();
-            }   
         }
     }
 
@@ -654,7 +463,11 @@ impl JokeriPokeri{
         loop {
             // print screen
             let _ = term.clear_screen();
+            println!("DEBUG: deck len {}", self.deck.cards.len());
             self.print_screen();
+            if self.funds == 0{
+                return;
+            }
             // handle input
             match term.read_key().unwrap(){
                 console::Key::Escape =>{
@@ -707,13 +520,13 @@ impl JokeriPokeri{
                                 println!("No win :(");
                             }
                             self.state = GameState::PayOut;
-
                             
                         }
                         GameState::PayOut =>{
                             // confirm new round
                             //self.print_prompt();
                             self.state = GameState::Betting;
+                            self.reset_deck_and_hand();
                         }
                     }
                 }
