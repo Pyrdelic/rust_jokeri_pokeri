@@ -1,8 +1,8 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::{char, env, io::{self, stdout, Write}};
+use std::char;
 use console::Term;
-use console::style;
+//use console::style;
 
 
 
@@ -17,9 +17,9 @@ impl Card{
             suit: suit,
         }
     }
-    pub fn print(&self){
-        println!("Value: {} Suit: {}", self.value, self.suit);
-    }
+    // pub fn print(&self){
+    //     println!("Value: {} Suit: {}", self.value, self.suit);
+    // }
 }
 
 struct Deck {
@@ -39,11 +39,11 @@ impl Deck{
         return deck;
     }
 
-    fn print(&mut self){
-        for i in &self.cards{
-            println!("{} {}", i.value, i.suit);
-        }
-    }
+    // fn print(&mut self){
+    //     for i in &self.cards{
+    //         println!("{} {}", i.value, i.suit);
+    //     }
+    // }
     fn shuffle_deck(&mut self){
         self.cards.shuffle(&mut self.rng);
     }
@@ -66,28 +66,28 @@ impl Deck{
 struct Hand{
     //cards: Vec<Card>,
     cards: [Option<Card>; 5],
-    selections: Vec<u8>,
+    //selections: Vec<u8>,
 }
 impl Hand{
     pub fn new()->Self{
         Self { 
             cards: [None, None, None, None, None],
-            selections: Vec::new(),
+            //selections: Vec::new(),
         }
     }
 
     /// Returns true, if any of the card slots are None
-    fn has_nones(&self)->bool{
-        for element in &self.cards{
-            match element{
-                Some(_)=>{ continue; }
-                None=>{
-                    return true
-                }
-            }
-        }
-        return false
-    }
+    // fn has_nones(&self)->bool{
+    //     for element in &self.cards{
+    //         match element{
+    //             Some(_)=>{ continue; }
+    //             None=>{
+    //                 return true
+    //             }
+    //         }
+    //     }
+    //     return false
+    // }
 
     fn is_straight_flush(&self)->bool{
         if self.is_straight() && self.is_flush(){
@@ -319,7 +319,7 @@ struct JokeriPokeri{
 }
 impl JokeriPokeri{
     fn new()->Self{
-        let mut game: JokeriPokeri = JokeriPokeri { 
+        let game: JokeriPokeri = JokeriPokeri { 
             deck: Deck::new(), 
             hand: Hand::new(),
             discarded: Vec::new(),
@@ -387,7 +387,7 @@ impl JokeriPokeri{
         }
 
         // discard discard back to deck
-        for i in 0..self.discarded.len(){
+        for _i in 0..self.discarded.len(){
             self.deck.cards.push(self.discarded.remove(0));
         }
         // shuffle deck
@@ -413,29 +413,29 @@ impl JokeriPokeri{
         }
     }
 
-    fn query_quit(&mut self, input: &String){
-        let input_lowercase = input.to_lowercase();
-        match input_lowercase.as_str(){
-            "quit" | "exit" =>{
-                println!("Quitting.");
-                self.playing = false;
-            }
-            _ => {
+    // fn query_quit(&mut self, input: &String){
+    //     let input_lowercase = input.to_lowercase();
+    //     match input_lowercase.as_str(){
+    //         "quit" | "exit" =>{
+    //             println!("Quitting.");
+    //             self.playing = false;
+    //         }
+    //         _ => {
 
-            }
-        }
-    }
+    //         }
+    //     }
+    // }
 
-    fn bet_money(&mut self, bet_amount: u32){
-        if bet_amount >= 1 && bet_amount <= 100
-        && self.funds >= bet_amount{
-            self.bet_amount = bet_amount;
-            self.funds -= bet_amount;
-            self.state = GameState::HandSelection;
-        } else{
-            println!("Invaid bet!")
-        }
-    }
+    // fn bet_money(&mut self, bet_amount: u32){
+    //     if bet_amount >= 1 && bet_amount <= 100
+    //     && self.funds >= bet_amount{
+    //         self.bet_amount = bet_amount;
+    //         self.funds -= bet_amount;
+    //         self.state = GameState::HandSelection;
+    //     } else{
+    //         println!("Invaid bet!")
+    //     }
+    // }
 
     fn print_hand_and_selector(&self){
         self.hand.print();
@@ -676,6 +676,7 @@ fn main() {
 }
 
 #[cfg(test)]
+#[allow(unused_variables)]
 mod tests{
     use super::*;
 
@@ -849,12 +850,12 @@ mod tests{
             }
         }
         // has_nones
-        assert_eq!(game.hand.has_nones(), true);
+        //assert_eq!(game.hand.has_nones(), true);
 
         let deck_len_before_deal = game.deck.cards.len();
         // deal
         game.deal();
-        assert_eq!(game.hand.has_nones(), false);
+        //assert_eq!(game.hand.has_nones(), false);
 
         let deck_len_after_deal = game.deck.cards.len();
         assert_eq!(deck_len_before_deal - deck_len_after_deal, game.hand.cards.len());
