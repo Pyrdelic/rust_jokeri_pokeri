@@ -1,7 +1,8 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::{char, env, io::{self, Write}};
+use std::{char, env, io::{self, stdout, Write}};
 use console::Term;
+use console::style;
 
 
 
@@ -36,8 +37,8 @@ impl Deck{
         //deck.print();
         deck.shuffle_deck();
         return deck;
-
     }
+
     fn print(&mut self){
         for i in &self.cards{
             println!("{} {}", i.value, i.suit);
@@ -52,26 +53,16 @@ impl Deck{
         for value in 1..=13{
             //suites
             for character_code in 0x2660..=0x2663{
-                self.cards.push(Card::new(u8::from(value), char::from_u32(character_code).unwrap()))
+                self.cards.push(Card::new(u8::from(value)
+                , char::from_u32(character_code).unwrap()))
             }
         }
-        // TODO: add 2 (and implement) joker cards
+        // TODO: add 2 joker cards (and implement)
         // self.cards.push(Card::new(0, 'J'));
         // self.cards.push(Card::new(0, 'J'));
     }
 }
 
-enum WinCondition {
-    //FiveOfAKind,
-    StraightFlush,
-    FourOfAKind,
-    FullHouse,
-    Flush,
-    Straight,
-    ThreeOfAKind,
-    TwoPairs,
-    NoWin,
-}
 struct Hand{
     //cards: Vec<Card>,
     cards: [Option<Card>; 5],
@@ -286,8 +277,31 @@ enum GameState{
     Betting,
     HandSelection,
     PayOut,
+    GameOver,
 }
 
+enum Prize{
+    StraightFlush,
+    FourOfAKind,
+    FullHouse,
+    Flush,
+    Straight,
+    ThreeOfAKind,
+    TwoPairs,
+}
+impl Prize{
+    fn as_str(&self)->&'static str{
+        match self{
+            Prize::StraightFlush => "Straight flush",
+            Prize::FourOfAKind => "Four-of-a-kind",
+            Prize::FullHouse => "Full house",
+            Prize::Flush => "Flush",
+            Prize::Straight => "Straight",
+            Prize::ThreeOfAKind => "Three-of-a-kind",
+            Prize::TwoPairs => "Two pairs",
+        }
+    }
+}
 /// Struct to hold all of the game's data and functionality
 struct JokeriPokeri{
     deck: Deck,
@@ -296,6 +310,7 @@ struct JokeriPokeri{
     funds: u32,
     round: u32,
     bet_amount: u32,
+    latest_prize: Option<Prize>,
     latest_payout: u32,
     state: GameState,
     playing: bool,
@@ -316,8 +331,24 @@ impl JokeriPokeri{
             playing: true, 
             selector: 0,
             selected: [false, false, false, false, false],
+            latest_prize: None,
         };
         return game;
+    }
+
+    fn reset_game(&mut self){
+        self.deck = Deck::new();
+        self.hand = Hand::new();
+        self.discarded = Vec::new();
+        self.funds = 100;
+        self.round = 1;
+        self.bet_amount = 20;
+        self.latest_payout = 0;
+        self.state = GameState::Betting;
+        self.playing = true;
+        self.selector = 0;
+        self.selected = [false, false, false, false, false];
+        self.latest_prize = None;
     }
 
     /// Deals cards from deck to every unselected slot in hand.
@@ -406,50 +437,95 @@ impl JokeriPokeri{
         }
     }
 
+    fn print_hand_and_selector(&self){
+        self.hand.print();
+        // print hand selector row
+        if self.state == GameState::HandSelection{
+            // print selected row
+            for i in self.selected{
+                if i{
+                    print!("HLD");
+                } else {
+                    print!("   ");
+                }
+            }
+            println!();
+            // print selector
+            for i in 0..self.hand.cards.len(){
+                if self.selector == i{
+                    print!(" ^ ");
+                } else{
+                    print!("   ");
+                }
+            }
+            println!();
+        }
+        else {
+            println!();
+            println!();
+        }
+    }
+
+    fn print_prizes(&self){
+        println!("{:<25}{:<10}", Prize::StraightFlush.as_str(), 40*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::FourOfAKind.as_str(), 15*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::FullHouse.as_str(), 7*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::Flush.as_str(), 4*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::Straight.as_str(), 3*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::ThreeOfAKind.as_str(), 2*self.bet_amount);
+        println!("{:<25}{:<10}", Prize::TwoPairs.as_str(), 2*self.bet_amount);
+    }
+
     fn print_screen(&self){
+        self.print_prizes();
         println!();
+        self.print_hand_and_selector();
         self.print_stats();
-        println!();
-        println!();
         println!();
         match self.state{
             GameState::Betting=>{
+                //self.hand.print();
                 println!("b - cycle bet amount");
                 println!("enter - start game");
             }
             GameState::HandSelection=>{
+
+                //self.hand.print();
+                
+                //std::io::stdout().flush();
+
+                println!();
+
+                // print selector cursor row position
+                // for i in 0..self.hand.cards.len(){
+                //     if self.selector == i{
+                //         print!(" ^ ");
+                //     } else{
+                //         print!("   ");
+                //     }
+                // }
                 println!("left/right - move selector");
                 println!("space - select card");
                 println!("enter - continue");
 
-                self.hand.print();
-                // print selected row
-                for i in self.selected{
-                    if i{
-                        print!("HLD");
-                    } else {
-                        print!("   ");
-                    }
-                }
-                //std::io::stdout().flush();
-                println!();
-                // print selector cursor position
-                for i in 0..self.hand.cards.len(){
-                    if self.selector == i{
-                        print!(" ^ ");
-                    } else{
-                        print!("   ");
-                    }
-                }
-                println!();
-
             }
             GameState::PayOut=>{
-                if self.funds == 0{
-                    println!("GAME OVER");
-                    println!("OUT OF FUNDS");
+                match &self.latest_prize{
+                    Some(prize) => {
+                        println!("{}!", prize.as_str());
+                    }
+                    _=>{println!("No win.");}
                 }
-                self.hand.print();
+
+                if self.funds != 0 {
+                    println!("enter - new round");
+                }
+                //self.print_deck_and_selector();
+            }
+            GameState::GameOver =>{
+                println!("OUT OF FUNDS");
+                println!("You made it round {}", self.round);
+                println!("New game y/n?");
             }
         }
     }
@@ -463,11 +539,9 @@ impl JokeriPokeri{
         loop {
             // print screen
             let _ = term.clear_screen();
-            println!("DEBUG: deck len {}", self.deck.cards.len());
+            //println!("DEBUG: deck len {}", self.deck.cards.len());
             self.print_screen();
-            if self.funds == 0{
-                return;
-            }
+
             // handle input
             match term.read_key().unwrap(){
                 console::Key::Escape =>{
@@ -485,48 +559,63 @@ impl JokeriPokeri{
                             self.state = GameState::HandSelection;
                         }
                         GameState::HandSelection =>{
-                            self.hand.print();
+                            //self.hand.print();
                             self.deal();
+                            self.state = GameState::PayOut;
                             // check wins
                             if self.hand.is_straight_flush(){
-                                println!("Straight flush!");
+                                self.latest_prize = Some(Prize::StraightFlush);
+                                //println!("Straight flush!");
                                 self.funds += 40 * self.bet_amount;
                             }
                             else if self.hand.is_four_of_a_kind(){
-                                println!("Four of a kind!");
+                                self.latest_prize = Some(Prize::FourOfAKind);
+                                //println!("Four of a kind!");
                                 self.funds += 15 * self.bet_amount;
                             }
                             else if self.hand.is_full_house(){
-                                println!("Full house!");
+                                self.latest_prize = Some(Prize::FullHouse);
+                                //println!("Full house!");
                                 self.funds += 7 * self.bet_amount;
                             }
                             else if self.hand.is_flush(){
-                                println!("Flush!");
+                                self.latest_prize = Some(Prize::Flush);
+                                //println!("Flush!");
                                 self.funds += 4 * self.bet_amount;
                             }
                             else if self.hand.is_straight(){
-                                println!("Straight!");
+                                self.latest_prize = Some(Prize::Straight);
+                                //println!("Straight!");
                                 self.funds += 3 * self.bet_amount;
                             }
                             else if self.hand.is_three_of_a_kind(){
-                                println!("Three of a kind!");
+                                self.latest_prize = Some(Prize::ThreeOfAKind);
+                                //println!("Three of a kind!");
                                 self.funds += 2 * self.bet_amount;
                             }
                             else if self.hand.is_two_pairs(){
-                                println!("Two pairs!");
+                                self.latest_prize = Some(Prize::TwoPairs);
+                                //println!("Two pairs!");
                                 self.funds += 2 * self.bet_amount;
                             }
                             else{
-                                println!("No win :(");
+                                println!("No win");
                             }
-                            self.state = GameState::PayOut;
-                            
                         }
                         GameState::PayOut =>{
-                            // confirm new round
-                            //self.print_prompt();
-                            self.state = GameState::Betting;
-                            self.reset_deck_and_hand();
+                            
+                            if self.funds == 0{
+                                self.state = GameState::GameOver;
+                            }
+                            else{
+                                self.state = GameState::Betting;
+                                self.latest_prize = None;
+                                self.round += 1;
+                                self.reset_deck_and_hand();
+                            }
+                        }
+                        _ =>{
+                            
                         }
                     }
                 }
@@ -556,51 +645,31 @@ impl JokeriPokeri{
                         }
                     }
                 }
+                console::Key::Char('y') =>{
+                    if self.state == GameState::GameOver{
+                        self.reset_game();
+                    }
+                }
+                console::Key::Char('n') =>{
+                    if self.state == GameState::GameOver{
+                        break;
+                    }
+                }
                 _ => {}
             }
-
-
-            // if let Ok(character) = stdout.read_char(){
-            //     match character {
-            //         'q' | 'Q' => {
-            //             self.playing = false;
-            //             break;
-            //         }
-            //         'b' | 'B' =>{
-            //             if self.state == GameState::Betting{
-            //                 if self.bet_amount < 100{
-            //                     self.bet_amount += 20;
-            //                 }
-            //                 else {
-            //                     self.bet_amount = 20;
-            //                 }
-            //             }
-            //         }
-
-            //         _ => {
-            //             println!("{}", character);
-            //         }
-            //     }
-            // }
-            
-
-            // read user input
-            //self.print_stats();
-            //self.process();
         }
     }
 
     fn print_stats(&self){
-        println!("Funds: {}", self.funds);
-        println!("Round: {}", self.round);
-        println!("Bet: {}", self.bet_amount);
+        println!("Funds: {:<10}Bet: {:<10}Round: {:<10}", 
+        self.funds, self.bet_amount, self.round,);
     }
 }
 
 
 fn main() {
     //env::set_var("RUST_BACKTRACE", "1");
-    println!("Rust JokeriPokeri, a Pyrdelic excercise");
+    println!("Rust JokeriPokeri, a programming excercise");
 
     let mut game = JokeriPokeri::new();
     game.play();
